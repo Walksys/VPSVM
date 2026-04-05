@@ -1695,6 +1695,8 @@ async def get_host_stats(node_id: int) -> Dict:
             logger.error(f"Failed to get host stats from node {node['name']}: {e}")
             return {"cpu": 0.0, "ram": 0.0}
 
+resource_monitor_active = True
+
 def resource_monitor():
     global resource_monitor_active
     while resource_monitor_active:
