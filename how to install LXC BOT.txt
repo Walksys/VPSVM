@@ -12,7 +12,7 @@ mkdir -p ~/.config/pip && echo -e "[global]\nbreak-system-packages = true" > ~/.
 sudo nano /etc/systemd/system/bot.service
 
 [Unit]
-Description=UnixBot Discord Bot
+Description=FluxNode Discord Bot
 After=network.target
 
 [Service]
