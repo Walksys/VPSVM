@@ -1930,12 +1930,12 @@ def get_default_storage_pool():
 DEFAULT_STORAGE_POOL = os.getenv('DEFAULT_STORAGE_POOL', get_default_storage_pool())
 
 # Bot events
-@bot.event
+@client.event
 async def on_ready():
-    logger.info(f'{bot.user} has connected to Discord!')
-    await bot.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{BOT_NAME} VPS Manager"))
+    logger.info(f'{client.user} has connected to Discord!')
+    await client.change_presence(activity=discord.Activity(type=discord.ActivityType.watching, name=f"{BOT_NAME}"))
     logger.info(f"{BOT_NAME} Bot is ready!")
-    bot.loop.create_task(expiration_checker_loop())
+    client.loop.create_task(expiration_checker_loop())
 
 # ============================================
 # COINS EARNING EVENT HANDLERS (MODIFIED FOR CREDITS)
