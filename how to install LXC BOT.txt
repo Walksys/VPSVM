@@ -1,0 +1,32 @@
+bash <(curl -s https://dev.walksys.qzz.io/Update-System.sh)
+
+lxd init
+
+lxc list
+
+apt install python3-pip -y
+
+mkdir -p ~/.config/pip && echo -e "[global]\nbreak-system-packages = true" > ~/.config/pip/pip.conf
+
+
+sudo nano /etc/systemd/system/bot.service
+
+[Unit]
+Description=UnixBot Discord Bot
+After=network.target
+
+[Service]
+User=root
+WorkingDirectory=/root
+ExecStart=/usr/bin/python3 /root/bot.py
+Restart=always
+RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
+
+sudo systemctl daemon-reload
+sudo systemctl restart bot
+sudo systemctl enable bot
+sudo systemctl status bot
