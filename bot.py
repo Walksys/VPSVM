@@ -3858,41 +3858,6 @@ async def show_deploy_plans(ctx):
     embed.set_footer(text=f"{BOT_NAME} • Limit: 1 VPS per user")
     await ctx.send(embed=embed)
 
-@bot.command(name='resource-plans', aliases=['resources', 'upgrade-plans'])
-async def show_resource_plans(ctx):
-    """Show available resource upgrade plans"""
-    plans = get_resource_plans(active_only=True)
-    
-    if not plans:
-        await ctx.send(embed=create_error_embed("No Plans Available", 
-            "No resource plans are currently available. Contact an admin."))
-        return
-    
-    embed = create_info_embed("⚡ Resource Upgrade Plans", 
-        "Upgrade your VPS to more powerful resources!")
-    
-    for plan in plans:
-        plan_info = (
-            f"**New Resources:**\n"
-            f"• RAM: {plan['ram_gb']}GB\n"
-            f"• CPU: {plan['cpu_cores']} Core{'s' if plan['cpu_cores'] > 1 else ''}\n"
-            f"• Disk: {plan['disk_gb']}GB\n\n"
-            f"**Upgrade Cost:** {plan['upgrade_cost']:,} coins\n"
-            f"**Upgrade:** `{PREFIX}upgrade <vps_id> {plan['id']}`"
-        )
-        add_field(embed, f"{plan['icon']} {plan['name']}", plan_info, True)
-    
-    add_field(embed, "💡 How to Upgrade", 
-        f"`{PREFIX}upgrade <vps_number> <plan_id>`\n"
-        f"Example: `{PREFIX}upgrade 1 3` (Upgrade VPS #1 to Medium)", False)
-    
-    add_field(embed, "📝 Note", 
-        "Upgrades are permanent and cannot be downgraded.\n"
-        "Your VPS will be restarted during the upgrade.", False)
-    
-    embed.set_footer(text=f"{BOT_NAME} • Instant resource upgrades")
-    await ctx.send(embed=embed)
-
 @bot.command(name='upgrade', aliases=['upgrade-vps', 'vps-upgrade'])
 async def upgrade_vps(ctx, vps_number: int = None, plan_id: int = None):
     """Upgrade your VPS resources"""
@@ -3902,7 +3867,7 @@ async def upgrade_vps(ctx, vps_number: int = None, plan_id: int = None):
         await ctx.send(embed=create_error_embed("Usage", 
             f"Usage: `{PREFIX}upgrade <vps_number> <plan_id>`\n\n"
             f"**Example:** `{PREFIX}upgrade 1 3`\n"
-            f"**View Plans:** `{PREFIX}resource-plans`"))
+            f"**View Plans:** `{PREFIX}list-resource-plans`"))
         return
     
     # Get user's VPS
@@ -3923,7 +3888,7 @@ async def upgrade_vps(ctx, vps_number: int = None, plan_id: int = None):
     plan = get_resource_plan(plan_id)
     if not plan or not plan['active']:
         await ctx.send(embed=create_error_embed("Invalid Plan", 
-            f"Plan #{plan_id} not found. Use `{PREFIX}resource-plans` to see available plans."))
+            f"Plan #{plan_id} not found. Use `{PREFIX}list-resource-plans` to see available plans."))
         return
     
     # Check current resources
@@ -7143,14 +7108,22 @@ async def create_deploy_plan(ctx, name: str, ram: int, cpu: int, disk: int, days
                 f"Use `{PREFIX}edit-deploy-plan` to modify it."))
             return
         
-        # Create plan
-        cur.execute('''INSERT INTO deploy_plans 
-                       (name, description, ram_gb, cpu_cores, disk_gb, duration_days, cost_coins, icon, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                   (name, f"{ram}GB RAM, {cpu} CPU, {disk}GB Disk for {days} days", 
-                    ram, cpu, disk, days, cost, icon, datetime.now().isoformat()))
+        # Gap-Filling Logic: Find lowest available ID starting from 1
+        cur.execute('SELECT id FROM deploy_plans ORDER BY id')
+        existing_ids = set(row[0] for row in cur.fetchall())
         
-        plan_id = cur.lastrowid
+        new_id = 1
+        while new_id in existing_ids:
+            new_id += 1
+        
+        # Create plan with gap-filled ID
+        cur.execute('''INSERT INTO deploy_plans 
+                       (id, name, description, ram_gb, cpu_cores, disk_gb, duration_days, cost_coins, icon, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''',
+                   (new_id, name, f"{ram}GB RAM, {cpu} CPU, {disk}GB Disk for {days} days", 
+                    ram, cpu, disk, days, cost, icon, datetime.now().isoformat()))
+
+        plan_id = new_id
         conn.commit()
         conn.close()
         
@@ -9279,7 +9252,6 @@ class HelpView(discord.ui.View):
                 "name": "🚀 Plans & Deployment",
                 "commands": [
                     (f"{PREFIX}deploy-plans", "View all available VPS deployment plans"),
-                    (f"{PREFIX}resource-plans", "View all available resource upgrade plans"),
                     (f"{PREFIX}deploy <plan_id>", "Deploy your own VPS using a plan (costs coins)"),
                     (f"{PREFIX}upgrade <vps_number> <plan_id>", "Upgrade VPS resources with coins"),
                     (f"{PREFIX}renewprices", "View VPS renewal pricing packages"),
