@@ -3867,7 +3867,7 @@ async def upgrade_vps(ctx, vps_number: int = None, plan_id: int = None):
         await ctx.send(embed=create_error_embed("Usage", 
             f"Usage: `{PREFIX}upgrade <vps_number> <plan_id>`\n\n"
             f"**Example:** `{PREFIX}upgrade 1 3`\n"
-            f"**View Plans:** `{PREFIX}list-resource-plans`"))
+            f"**Note:** Contact an admin to view available upgrade plans."))
         return
     
     # Get user's VPS
@@ -3888,7 +3888,7 @@ async def upgrade_vps(ctx, vps_number: int = None, plan_id: int = None):
     plan = get_resource_plan(plan_id)
     if not plan or not plan['active']:
         await ctx.send(embed=create_error_embed("Invalid Plan", 
-            f"Plan #{plan_id} not found. Use `{PREFIX}list-resource-plans` to see available plans."))
+            f"Plan #{plan_id} not found. Contact an admin to see available upgrade plans."))
         return
     
     # Check current resources
@@ -7254,165 +7254,6 @@ async def delete_deploy_plan(ctx, plan_id: int):
         await ctx.send(embed=create_error_embed("Deletion Failed", f"Error: {str(e)}"))
         logger.error(f"Failed to delete deploy plan: {e}")
 
-@bot.command(name='create-resource-plan', aliases=['add-resource-plan', 'new-resource-plan'])
-@is_admin()
-async def create_resource_plan(ctx, name: str, ram: int, cpu: int, disk: int, cost: int, icon: str = "⚡"):
-    """Create a new resource upgrade plan"""
-    
-    if ram < 1 or cpu < 1 or disk < 1 or cost < 1:
-        await ctx.send(embed=create_error_embed("Invalid Values", 
-            "All values must be positive numbers."))
-        return
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Check if plan name already exists
-        cur.execute('SELECT id FROM resource_plans WHERE name = ?', (name,))
-        if cur.fetchone():
-            conn.close()
-            await ctx.send(embed=create_error_embed("Plan Exists", 
-                f"A resource plan named **{name}** already exists.\n"
-                f"Use `{PREFIX}edit-resource-plan` to modify it."))
-            return
-        
-        # Create plan
-        cur.execute('''INSERT INTO resource_plans 
-                       (name, description, ram_gb, cpu_cores, disk_gb, upgrade_cost, icon, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
-                   (name, f"{ram}GB RAM, {cpu} CPU, {disk}GB Disk", 
-                    ram, cpu, disk, cost, icon, datetime.now().isoformat()))
-        
-        plan_id = cur.lastrowid
-        conn.commit()
-        conn.close()
-        
-        embed = create_success_embed("✅ Resource Plan Created", 
-            f"**Plan ID:** {plan_id}\n"
-            f"**Name:** {icon} {name}\n"
-            f"**Resources:** {ram}GB RAM, {cpu} CPU, {disk}GB Disk\n"
-            f"**Upgrade Cost:** {cost:,} coins\n\n"
-            f"Users can now upgrade with: `{PREFIX}upgrade <vps_id> {plan_id}`")
-        
-        await ctx.send(embed=embed)
-        logger.info(f"Admin {ctx.author.name} created resource plan: {name}")
-        
-    except Exception as e:
-        await ctx.send(embed=create_error_embed("Creation Failed", f"Error: {str(e)}"))
-        logger.error(f"Failed to create resource plan: {e}")
-
-@bot.command(name='edit-resource-plan', aliases=['update-resource-plan', 'modify-resource-plan'])
-@is_admin()
-async def edit_resource_plan(ctx, plan_id: int, field: str, value: str):
-    """Edit a resource upgrade plan"""
-    
-    valid_fields = ['name', 'ram', 'cpu', 'disk', 'cost', 'icon', 'description', 'active']
-    if field.lower() not in valid_fields:
-        await ctx.send(embed=create_error_embed("Invalid Field", 
-            f"Valid fields: {', '.join(valid_fields)}"))
-        return
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Check if plan exists
-        cur.execute('SELECT * FROM resource_plans WHERE id = ?', (plan_id,))
-        plan = cur.fetchone()
-        if not plan:
-            conn.close()
-            await ctx.send(embed=create_error_embed("Plan Not Found", 
-                f"Resource plan #{plan_id} not found."))
-            return
-        
-        plan = dict(plan)
-        
-        # Map field names to database columns
-        field_map = {
-            'name': 'name',
-            'ram': 'ram_gb',
-            'cpu': 'cpu_cores',
-            'disk': 'disk_gb',
-            'cost': 'upgrade_cost',
-            'icon': 'icon',
-            'description': 'description',
-            'active': 'active'
-        }
-        
-        db_field = field_map[field.lower()]
-        
-        # Validate and convert value
-        if field.lower() in ['ram', 'cpu', 'disk', 'cost']:
-            try:
-                value = int(value)
-                if value < 1:
-                    raise ValueError("Must be positive")
-            except ValueError:
-                await ctx.send(embed=create_error_embed("Invalid Value", 
-                    f"{field} must be a positive number."))
-                conn.close()
-                return
-        elif field.lower() == 'active':
-            value = 1 if value.lower() in ['1', 'true', 'yes', 'active'] else 0
-        
-        # Update plan
-        cur.execute(f'UPDATE resource_plans SET {db_field} = ? WHERE id = ?', (value, plan_id))
-        conn.commit()
-        conn.close()
-        
-        embed = create_success_embed("✅ Plan Updated", 
-            f"**Plan ID:** {plan_id}\n"
-            f"**Plan Name:** {plan['name']}\n"
-            f"**Updated Field:** {field}\n"
-            f"**New Value:** {value}\n\n"
-            f"Changes will apply to new upgrades.")
-        
-        await ctx.send(embed=embed)
-        logger.info(f"Admin {ctx.author.name} updated resource plan {plan_id}: {field} = {value}")
-        
-    except Exception as e:
-        await ctx.send(embed=create_error_embed("Update Failed", f"Error: {str(e)}"))
-        logger.error(f"Failed to update resource plan: {e}")
-
-@bot.command(name='delete-resource-plan', aliases=['remove-resource-plan'])
-@is_admin()
-async def delete_resource_plan(ctx, plan_id: int):
-    """Delete a resource upgrade plan"""
-    
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        
-        # Check if plan exists
-        cur.execute('SELECT * FROM resource_plans WHERE id = ?', (plan_id,))
-        plan = cur.fetchone()
-        if not plan:
-            conn.close()
-            await ctx.send(embed=create_error_embed("Plan Not Found", 
-                f"Resource plan #{plan_id} not found."))
-            return
-        
-        plan = dict(plan)
-        
-        # Delete plan
-        cur.execute('DELETE FROM resource_plans WHERE id = ?', (plan_id,))
-        conn.commit()
-        conn.close()
-        
-        embed = create_success_embed("✅ Plan Deleted", 
-            f"**Plan ID:** {plan_id}\n"
-            f"**Plan Name:** {plan['icon']} {plan['name']}\n"
-            f"**Resources:** {plan['ram_gb']}GB RAM, {plan['cpu_cores']} CPU, {plan['disk_gb']}GB Disk\n\n"
-            f"This plan is no longer available for upgrades.")
-        
-        await ctx.send(embed=embed)
-        logger.info(f"Admin {ctx.author.name} deleted resource plan {plan_id}: {plan['name']}")
-        
-    except Exception as e:
-        await ctx.send(embed=create_error_embed("Deletion Failed", f"Error: {str(e)}"))
-        logger.error(f"Failed to delete resource plan: {e}")
-
 @bot.command(name='list-deploy-plans', aliases=['all-deploy-plans'])
 @is_admin()
 async def list_deploy_plans_admin(ctx):
@@ -7445,40 +7286,6 @@ async def list_deploy_plans_admin(ctx):
         f"**Create:** `{PREFIX}create-deploy-plan <name> <ram> <cpu> <disk> <days> <cost> [icon]`\n"
         f"**Edit:** `{PREFIX}edit-deploy-plan <id> <field> <value>`\n"
         f"**Delete:** `{PREFIX}delete-deploy-plan <id>`", False)
-    
-    await ctx.send(embed=embed)
-
-@bot.command(name='list-resource-plans', aliases=['all-resource-plans'])
-@is_admin()
-async def list_resource_plans_admin(ctx):
-    """List all resource plans (including inactive)"""
-    
-    plans = get_resource_plans(active_only=False)
-    
-    if not plans:
-        await ctx.send(embed=create_error_embed("No Plans", 
-            f"No resource plans exist. Create one with `{PREFIX}create-resource-plan`."))
-        return
-    
-    embed = create_info_embed("📋 All Resource Plans (Admin View)", 
-        "All resource upgrade plans including inactive ones")
-    
-    for plan in plans:
-        status = "✅ Active" if plan['active'] else "❌ Inactive"
-        plan_info = (
-            f"**ID:** {plan['id']}\n"
-            f"**Status:** {status}\n"
-            f"**Resources:** {plan['ram_gb']}GB RAM, {plan['cpu_cores']} CPU, {plan['disk_gb']}GB\n"
-            f"**Cost:** {plan['upgrade_cost']:,} coins\n"
-            f"**Edit:** `{PREFIX}edit-resource-plan {plan['id']} <field> <value>`\n"
-            f"**Delete:** `{PREFIX}delete-resource-plan {plan['id']}`"
-        )
-        add_field(embed, f"{plan['icon']} {plan['name']}", plan_info, True)
-    
-    add_field(embed, "💡 Management", 
-        f"**Create:** `{PREFIX}create-resource-plan <name> <ram> <cpu> <disk> <cost> [icon]`\n"
-        f"**Edit:** `{PREFIX}edit-resource-plan <id> <field> <value>`\n"
-        f"**Delete:** `{PREFIX}delete-resource-plan <id>`", False)
     
     await ctx.send(embed=embed)
 
@@ -9260,11 +9067,7 @@ class HelpView(discord.ui.View):
                     (f"{PREFIX}create-deploy-plan <name> <ram> <cpu> <disk> <days> <cost> [icon]", "Create deployment plan (Admin only)"),
                     (f"{PREFIX}edit-deploy-plan <id> <field> <value>", "Edit deployment plan (Admin only)"),
                     (f"{PREFIX}delete-deploy-plan <id>", "Delete deployment plan (Admin only)"),
-                    (f"{PREFIX}create-resource-plan <name> <ram> <cpu> <disk> <cost> [icon]", "Create resource plan (Admin only)"),
-                    (f"{PREFIX}edit-resource-plan <id> <field> <value>", "Edit resource plan (Admin only)"),
-                    (f"{PREFIX}delete-resource-plan <id>", "Delete resource plan (Admin only)"),
-                    (f"{PREFIX}list-deploy-plans", "List all deployment plans (Admin only)"),
-                    (f"{PREFIX}list-resource-plans", "List all resource plans (Admin only)")
+                    (f"{PREFIX}list-deploy-plans", "List all deployment plans (Admin only)")
                 ]
             },
             "coupons": {
