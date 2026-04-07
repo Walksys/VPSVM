@@ -27,6 +27,7 @@ if not DISCORD_TOKEN:
 BOT_NAME = os.getenv('BOT_NAME', 'FluxNodes')
 PREFIX = os.getenv('PREFIX', '!')
 YOUR_SERVER_IP = os.getenv('YOUR_SERVER_IP', '127.0.0.1')
+SERVER_GUILD_ID = int(os.getenv('SERVER_GUILD_ID', '0'))
 MAIN_ADMIN_ID = int(os.getenv('MAIN_ADMIN_ID', '0'))
 VPS_USER_ROLE_ID = int(os.getenv('VPS_USER_ROLE_ID', '0'))
 DEFAULT_STORAGE_POOL = os.getenv('DEFAULT_STORAGE_POOL', 'default')
@@ -1831,9 +1832,15 @@ def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding
         timestamp=datetime.now(timezone.utc)
     )
     
-    # Dynamic thumbnail - use server icon if available, otherwise fallback to bot avatar
-    if guild and guild.icon:
-        embed.set_thumbnail(url=guild.icon.url)
+    # Dynamic thumbnail - use server icon from SERVER_GUILD_ID, then guild parameter, then bot avatar
+    target_guild = None
+    if SERVER_GUILD_ID:
+        target_guild = bot.get_guild(SERVER_GUILD_ID)
+    elif guild:
+        target_guild = guild
+    
+    if target_guild and target_guild.icon:
+        embed.set_thumbnail(url=target_guild.icon.url)
     elif bot.user and bot.user.avatar:
         embed.set_thumbnail(url=bot.user.avatar.url)
     else:
