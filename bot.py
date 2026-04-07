@@ -32,16 +32,17 @@ VPS_USER_ROLE_ID = int(os.getenv('VPS_USER_ROLE_ID', '0'))
 DEFAULT_STORAGE_POOL = os.getenv('DEFAULT_STORAGE_POOL', 'default')
 BOT_VERSION = os.getenv('BOT_VERSION', '8.0-PRO')
 BOT_DEVELOPER = os.getenv('BOT_DEVELOPER', 'WalksysDev')
+BOT_LOGO_URL = "https://i.ibb.co/3mKbm1d2/Untitled18-20260407162528.png"
 
 # OS Options for VPS Creation and Reinstall
 OS_OPTIONS = [
-    {"label": "Ubuntu 20.04 LTS", "value": "ubuntu:20.04"},
-    {"label": "Ubuntu 22.04 LTS", "value": "ubuntu:22.04"},
-    {"label": "Ubuntu 24.04 LTS", "value": "ubuntu:24.04"},
-    {"label": "Debian 10 (Buster)", "value": "images:debian/10"},
-    {"label": "Debian 11 (Bullseye)", "value": "images:debian/11"},
-    {"label": "Debian 12 (Bookworm)", "value": "images:debian/12"},
-    {"label": "Debian 13 (Trixie)", "value": "images:debian/13"},
+    {"label": "🐧 Ubuntu 24.04 (Noble)", "value": "ubuntu:24.04"},
+    {"label": "🐧 Ubuntu 22.04 (Jammy)", "value": "ubuntu:22.04"},
+    {"label": "🐧 Ubuntu 20.04 (Focal)", "value": "ubuntu:20.04"},
+    {"label": "🌀 Debian 13 (Trixie)", "value": "images:debian/13"},
+    {"label": "🌀 Debian 12 (Bookworm)", "value": "images:debian/12"},
+    {"label": "🌀 Debian 11 (Bullseye)", "value": "images:debian/11"},
+    {"label": "🌀 Debian 10 (Buster)", "value": "images:debian/10"},
 ]
 
 # Configure logging to file and console
@@ -357,6 +358,7 @@ def init_db():
         ('shop_booster_2x_24hour', '1500'),
         ('shop_username_color', '1000'),
         ('shop_custom_role', '2000'),
+        ('max_vps_per_user', '2'),
     ]
     for key, value in coin_settings:
         cur.execute('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)', (key, value))
@@ -1829,15 +1831,19 @@ def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding
         timestamp=datetime.now(timezone.utc)
     )
     
-    # Dynamic thumbnail - Server's icon (top right)
+    # Dynamic thumbnail - use server icon if available, otherwise fallback to bot avatar
     if guild and guild.icon:
-        embed.set_thumbnail(url=guild.icon_url)
+        embed.set_thumbnail(url=guild.icon.url)
+    elif bot.user and bot.user.avatar:
+        embed.set_thumbnail(url=bot.user.avatar.url)
+    else:
+        embed.set_thumbnail(url=BOT_LOGO_URL)
     
     # Large footer banner (bottom)
     if show_branding:
         embed.set_footer(
             text=f"{BOT_NAME} v{BOT_VERSION} {EmbedIcons.BULLET} Powered by {BOT_DEVELOPER}",
-            icon_url="https://i.imgur.com/dpatuSj.png"
+            icon_url=BOT_LOGO_URL
         )
         embed.set_image(url=LARGE_FOOTER_IMAGE)
     
@@ -3157,7 +3163,7 @@ async def uptime(ctx):
     up = get_uptime()
     
     embed = create_info_embed("System Uptime", show_icon=False)
-    embed.set_thumbnail(url="https://i.imgur.com/dpatuSj.png")
+    embed.set_thumbnail(url=BOT_LOGO_URL)
     
     add_field(embed, "🕐 Host Uptime", f"```{up}```", False)
     add_field(embed, "📊 Status", "All systems operational", False)
@@ -3587,9 +3593,9 @@ async def deploy_vps(ctx, plan_id: int = None):
     """Deploy your own VPS using coins - Use !deploy-plans to see available plans"""
     user_id = str(ctx.author.id)
     
-    # Check if user already has a VPS (Max 2 VPS per user)
+    # Check if user already has a VPS (Max VPS per user from settings)
     vps_list = vps_data.get(user_id, [])
-    MAX_VPS_PER_USER = 2
+    MAX_VPS_PER_USER = int(get_setting('max_vps_per_user', 2))
     if len(vps_list) >= MAX_VPS_PER_USER:
         await ctx.send(embed=create_error_embed("VPS Limit Reached", 
             f"Sorry, you have reached the maximum limit of {MAX_VPS_PER_USER} VPS units per user.\n\n"
@@ -5276,7 +5282,7 @@ async def system_status(ctx):
     
     # Footer with current time
     embed.set_footer(text=f"{BOT_NAME} System Status • Updated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-                    icon_url="https://i.imgur.com/dpatuSj.png")
+                    icon_url=BOT_LOGO_URL)
     
     await ctx.send(embed=embed)
 
@@ -6380,7 +6386,7 @@ async def about(ctx):
         "Professional VPS management platform for Discord communities"
     )
     
-    embed.set_thumbnail(url="https://i.imgur.com/dpatuSj.png")
+    embed.set_thumbnail(url=BOT_LOGO_URL)
     
     # Bot information
     add_field(embed, "Platform", f"```{BOT_NAME}```", True)
