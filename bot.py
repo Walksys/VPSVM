@@ -1806,7 +1806,9 @@ class EmbedIcons:
     BULLET = "•"
     DIVIDER = "─"
     
-def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding=True):
+LARGE_FOOTER_IMAGE = "https://i.ibb.co/tpmJ95jK/08d327f8e6de.png"
+
+def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding=True, guild=None):
     """
     Create a premium-styled Discord embed with modern design principles
     
@@ -1815,6 +1817,7 @@ def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding
         description: Main content
         color: Hex color code
         show_branding: Whether to show footer branding
+        guild: Discord guild for dynamic thumbnail (server icon)
     """
     # Clean title - no emoji spam
     clean_title = truncate_text(title, 256)
@@ -1826,12 +1829,17 @@ def create_embed(title, description="", color=EmbedColors.PRIMARY, show_branding
         timestamp=datetime.now(timezone.utc)
     )
     
-    # Premium footer with minimal branding
+    # Dynamic thumbnail - Server's icon (top right)
+    if guild and guild.icon:
+        embed.set_thumbnail(url=guild.icon_url)
+    
+    # Large footer banner (bottom)
     if show_branding:
         embed.set_footer(
             text=f"{BOT_NAME} v{BOT_VERSION} {EmbedIcons.BULLET} Powered by {BOT_DEVELOPER}",
             icon_url="https://i.imgur.com/dpatuSj.png"
         )
+        embed.set_image(url=LARGE_FOOTER_IMAGE)
     
     return embed
 
@@ -1856,59 +1864,59 @@ def add_field(embed, name, value, inline=False):
     )
     return embed
 
-def create_success_embed(title, description="", show_icon=True):
+def create_success_embed(title, description="", show_icon=True, guild=None):
     """
     Success state embed - Clean green design
     
     Usage: Successful operations, confirmations
     """
     icon = f"{EmbedIcons.SUCCESS} " if show_icon else ""
-    return create_embed(f"{icon}{title}", description, color=EmbedColors.SUCCESS)
+    return create_embed(f"{icon}{title}", description, color=EmbedColors.SUCCESS, guild=guild)
 
-def create_error_embed(title, description="", show_icon=True):
+def create_error_embed(title, description="", show_icon=True, guild=None):
     """
     Error state embed - Clean red design
     
     Usage: Errors, failures, access denied
     """
     icon = f"{EmbedIcons.ERROR} " if show_icon else ""
-    return create_embed(f"{icon}{title}", description, color=EmbedColors.ERROR)
+    return create_embed(f"{icon}{title}", description, color=EmbedColors.ERROR, guild=guild)
 
-def create_info_embed(title, description="", show_icon=True):
+def create_info_embed(title, description="", show_icon=True, guild=None):
     """
     Information embed - Clean blue design
     
     Usage: General information, help text
     """
     icon = f"{EmbedIcons.INFO} " if show_icon else ""
-    return create_embed(f"{icon}{title}", description, color=EmbedColors.INFO)
+    return create_embed(f"{icon}{title}", description, color=EmbedColors.INFO, guild=guild)
 
-def create_warning_embed(title, description="", show_icon=True):
+def create_warning_embed(title, description="", show_icon=True, guild=None):
     """
     Warning state embed - Clean yellow design
     
     Usage: Warnings, cautions, confirmations needed
     """
     icon = f"{EmbedIcons.WARNING} " if show_icon else ""
-    return create_embed(f"{icon}{title}", description, color=EmbedColors.WARNING)
+    return create_embed(f"{icon}{title}", description, color=EmbedColors.WARNING, guild=guild)
 
-def create_premium_embed(title, description=""):
+def create_premium_embed(title, description="", guild=None):
     """
     Premium feature embed - Special pink/purple design
     
     Usage: Premium features, special announcements
     """
-    return create_embed(f"{EmbedIcons.PREMIUM} {title}", description, color=EmbedColors.PREMIUM)
+    return create_embed(f"{EmbedIcons.PREMIUM} {title}", description, color=EmbedColors.PREMIUM, guild=guild)
 
-def create_loading_embed(title, description="Processing your request..."):
+def create_loading_embed(title, description="Processing your request...", guild=None):
     """
     Loading state embed - Indicates ongoing process
     
     Usage: Long-running operations
     """
-    return create_embed(f"{EmbedIcons.LOADING} {title}", description, color=EmbedColors.INFO)
+    return create_embed(f"{EmbedIcons.LOADING} {title}", description, color=EmbedColors.INFO, guild=guild)
 
-def create_card_embed(title, description="", color=EmbedColors.DARK):
+def create_card_embed(title, description="", color=EmbedColors.DARK, guild=None):
     """
     Card-style embed for displaying structured data
     
@@ -3579,15 +3587,16 @@ async def deploy_vps(ctx, plan_id: int = None):
     """Deploy your own VPS using coins - Use !deploy-plans to see available plans"""
     user_id = str(ctx.author.id)
     
-    # Check if user already has a VPS
+    # Check if user already has a VPS (Max 2 VPS per user)
     vps_list = vps_data.get(user_id, [])
-    if len(vps_list) >= 1:
-        await ctx.send(embed=create_error_embed("❌ VPS Limit Reached", 
-            f"You already have **{len(vps_list)} VPS**!\n\n"
-            f"**Limit:** 1 VPS per user\n"
-            f"**Your VPS:** `{vps_list[0]['container_name']}`\n\n"
-            f"Use `{PREFIX}manage` to control your existing VPS.\n"
-            f"Contact an admin if you need additional VPS."))
+    MAX_VPS_PER_USER = 2
+    if len(vps_list) >= MAX_VPS_PER_USER:
+        await ctx.send(embed=create_error_embed("VPS Limit Reached", 
+            f"Sorry, you have reached the maximum limit of {MAX_VPS_PER_USER} VPS units per user.\n\n"
+            f"**Your VPS Count:** {len(vps_list)}\n"
+            f"**Limit:** {MAX_VPS_PER_USER} VPS per user\n\n"
+            f"Use `{PREFIX}manage` to control your existing VPS units.\n"
+            f"Contact an admin if you need additional VPS.", guild=ctx.guild))
         return
     
     # If no plan specified, show plans
@@ -3596,7 +3605,7 @@ async def deploy_vps(ctx, plan_id: int = None):
             f"Please specify a deployment plan!\n\n"
             f"**View Plans:** `{PREFIX}deploy-plans`\n"
             f"**Deploy:** `{PREFIX}deploy <plan_id>`\n\n"
-            f"**Example:** `{PREFIX}deploy 2` (Basic plan)"))
+            f"**Example:** `{PREFIX}deploy 2` (Basic plan)", guild=ctx.guild))
         return
     
     # Get deployment plan
@@ -3604,7 +3613,7 @@ async def deploy_vps(ctx, plan_id: int = None):
     if not plan or not plan['active']:
         await ctx.send(embed=create_error_embed("Invalid Plan", 
             f"Plan #{plan_id} not found or inactive.\n\n"
-            f"Use `{PREFIX}deploy-plans` to see available plans."))
+            f"Use `{PREFIX}deploy-plans` to see available plans.", guild=ctx.guild))
         return
     
     # VPS specifications from plan
@@ -3630,7 +3639,7 @@ async def deploy_vps(ctx, plan_id: int = None):
             f"**Earn Coins:**\n"
             f"• `{PREFIX}daily` - Daily reward\n"
             f"• `{PREFIX}work` - Work for coins\n"
-            f"• `{PREFIX}coinhelp` - More ways to earn"))
+            f"• `{PREFIX}coinhelp` - More ways to earn", guild=ctx.guild))
         return
     
     # Show deployment confirmation
@@ -3650,7 +3659,7 @@ async def deploy_vps(ctx, plan_id: int = None):
         f"• Docker ready\n"
         f"• SSH access\n"
         f"• Port forwarding\n\n"
-        f"React with ✅ to confirm or ❌ to cancel")
+        f"React with ✅ to confirm or ❌ to cancel", guild=ctx.guild)
     
     msg = await ctx.send(embed=embed)
     await msg.add_reaction("✅")
@@ -4205,12 +4214,15 @@ class ManageView(discord.ui.View):
         start_button.callback = lambda inter: self.action_callback(inter, 'start')
         stop_button = discord.ui.Button(label="⏸ Stop", style=discord.ButtonStyle.secondary)
         stop_button.callback = lambda inter: self.action_callback(inter, 'stop')
+        restart_button = discord.ui.Button(label="🔁 Restart", style=discord.ButtonStyle.primary)
+        restart_button.callback = lambda inter: self.action_callback(inter, 'restart')
         ssh_button = discord.ui.Button(label="🔑 SSH", style=discord.ButtonStyle.primary)
         ssh_button.callback = lambda inter: self.action_callback(inter, 'tmate')
         stats_button = discord.ui.Button(label="📊 Stats", style=discord.ButtonStyle.secondary)
         stats_button.callback = lambda inter: self.action_callback(inter, 'stats')
         self.add_item(start_button)
         self.add_item(stop_button)
+        self.add_item(restart_button)
         self.add_item(ssh_button)
         self.add_item(stats_button)
 
@@ -4316,6 +4328,17 @@ class ManageView(discord.ui.View):
                 await interaction.followup.send(embed=create_success_embed("VPS Stopped", f"VPS `{container_name}` has been stopped!"), ephemeral=True)
             except Exception as e:
                 await interaction.followup.send(embed=create_error_embed("Stop Failed", str(e)), ephemeral=True)
+        elif action == 'restart':
+            if suspended:
+                await interaction.followup.send(embed=create_error_embed("Access Denied", "Cannot restart suspended VPS."), ephemeral=True)
+                return
+            try:
+                await execute_lxc(container_name, f"restart {container_name}", timeout=180, node_id=node_id)
+                target_vps["status"] = "running"
+                save_vps_data()
+                await interaction.followup.send(embed=create_success_embed("VPS Restarted", "Your VPS has been successfully restarted and is now running."), ephemeral=True)
+            except Exception as e:
+                await interaction.followup.send(embed=create_error_embed("Restart Failed", str(e)), ephemeral=True)
         elif action == 'tmate':
             if suspended:
                 await interaction.followup.send(embed=create_error_embed("Access Denied", "Cannot access suspended VPS."), ephemeral=True)
@@ -4356,20 +4379,20 @@ class ManageView(discord.ui.View):
 async def manage_vps(ctx, user: discord.Member = None):
     if user:
         if str(ctx.author.id) != str(MAIN_ADMIN_ID) and str(ctx.author.id) not in admin_data.get("admins", []):
-            await ctx.send(embed=create_error_embed("Access Denied", "Only admins can manage other users' VPS."))
+            await ctx.send(embed=create_error_embed("Access Denied", "Only admins can manage other users' VPS.", guild=ctx.guild))
             return
         user_id = str(user.id)
         vps_list = vps_data.get(user_id, [])
         if not vps_list:
-            await ctx.send(embed=create_error_embed("No VPS Found", f"{user.mention} doesn't have any {BOT_NAME} VPS."))
+            await ctx.send(embed=create_error_embed("No VPS Found", f"{user.mention} doesn't have any {BOT_NAME} VPS.", guild=ctx.guild))
             return
         view = ManageView(str(ctx.author.id), vps_list, is_admin=True, owner_id=user_id)
-        await ctx.send(embed=create_info_embed(f"Managing {user.name}'s VPS", f"Managing VPS for {user.mention}"), view=view)
+        await ctx.send(embed=create_info_embed(f"Managing {user.name}'s VPS", f"Managing VPS for {user.mention}", guild=ctx.guild), view=view)
     else:
         user_id = str(ctx.author.id)
         vps_list = vps_data.get(user_id, [])
         if not vps_list:
-            embed = create_error_embed("No VPS Found", f"You don't have any {BOT_NAME} VPS. Contact an admin to create one.")
+            embed = create_error_embed("No VPS Found", f"You don't have any {BOT_NAME} VPS. Contact an admin to create one.", guild=ctx.guild)
             add_field(embed, "Quick Actions", f"• `{PREFIX}manage` - Manage VPS\n• Contact admin for VPS creation", False)
             await ctx.send(embed=embed)
             return
